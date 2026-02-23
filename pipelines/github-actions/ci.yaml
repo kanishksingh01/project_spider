@@ -1,0 +1,38 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies for linting
+        run: |
+          pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          yamllint --format colored .
+
+      - name: Install kustomize
+        run: |
+          curl -sLo kustomize.tar.gz "https://github.com/kubernetes-sigs/kustomize/releases/latest/download/kustomize_v4.5.7_linux_amd64.tar.gz"
+          tar -xzf kustomize.tar.gz
+          sudo mv kustomize/kustomize /usr/local/bin/kustomize
+
+      - name: Validate cluster manifests
+        run: |
+          kustomize build clusters/dev/cluster-a
+          kustomize build clusters/prod/cluster-b
