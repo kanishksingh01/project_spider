@@ -1,0 +1,22 @@
+services:
+  spider-api:
+    build:
+      context: ./apps/tenants/spider-api
+      dockerfile: Dockerfile
+    image: spider-api:local
+    container_name: spider-api
+    environment:
+      APP_VERSION: local
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s

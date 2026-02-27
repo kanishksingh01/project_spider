@@ -2,21 +2,21 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: "3.12"
 
       - name: Install dependencies for linting
         run: |
@@ -24,15 +24,31 @@ jobs:
 
       - name: Lint YAML files
         run: |
-          yamllint --format colored .
+          yamllint --strict --format colored .
 
       - name: Install kustomize
-        run: |
-          curl -sLo kustomize.tar.gz "https://github.com/kubernetes-sigs/kustomize/releases/latest/download/kustomize_v4.5.7_linux_amd64.tar.gz"
-          tar -xzf kustomize.tar.gz
-          sudo mv kustomize/kustomize /usr/local/bin/kustomize
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.4.2"
 
       - name: Validate cluster manifests
         run: |
           kustomize build clusters/dev/cluster-a
           kustomize build clusters/prod/cluster-b
+
+      - name: Build Docker image
+        run: |
+          docker build -t spider-api:ci apps/tenants/spider-api
+
+      - name: Run deployment smoke test
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name spider-api-ci -p 8080:8080 spider-api:ci
+          trap "docker rm -f spider-api-ci" EXIT
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:8080/healthz > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://localhost:8080/healthz
